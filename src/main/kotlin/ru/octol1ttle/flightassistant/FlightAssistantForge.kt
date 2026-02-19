@@ -11,6 +11,7 @@ import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers
 import nl.enjarai.doabarrelroll.compat.flightassistant.DaBRCompatFA
+import by.dragonsurvivalteam.dragonsurvival.compat.flightassistant.DragonSurvivalCompat
 import ru.octol1ttle.flightassistant.api.util.event.FixedGuiRenderCallback
 import ru.octol1ttle.flightassistant.config.FAConfigScreen
 import thedarkcolour.kotlinforforge.neoforge.KotlinModLoadingContext
@@ -24,6 +25,7 @@ import net.minecraftforge.eventbus.api.IEventBus
 import net.minecraftforge.fml.ModLoadingContext
 import net.minecraftforge.fml.common.Mod
 import nl.enjarai.doabarrelroll.compat.flightassistant.DaBRCompatFA
+import by.dragonsurvivalteam.dragonsurvival.compat.flightassistant.DragonSurvivalCompat
 import ru.octol1ttle.flightassistant.api.util.event.FixedGuiRenderCallback
 import ru.octol1ttle.flightassistant.config.FAConfigScreen
 import thedarkcolour.kotlinforforge.KotlinModLoadingContext
@@ -36,6 +38,7 @@ object FlightAssistantForge {
     init {
         FlightAssistant.init()
         DaBRCompatFA.init()
+        DragonSurvivalCompat.init()
         ModLoadingContext.get().registerExtensionPoint(
             CSF::class.java,
         ) { CSF { _, parent -> FAConfigScreen.generate(parent) } }

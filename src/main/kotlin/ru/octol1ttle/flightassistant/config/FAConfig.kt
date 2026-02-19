@@ -12,6 +12,7 @@ import ru.octol1ttle.flightassistant.config.options.DisplayOptions
 import ru.octol1ttle.flightassistant.config.options.DisplayOptionsStorage
 import ru.octol1ttle.flightassistant.config.options.GlobalOptions
 import ru.octol1ttle.flightassistant.config.options.SafetyOptions
+import by.dragonsurvivalteam.dragonsurvival.compat.flightassistant.DragonSurvivalCompat
 
 object FAConfig {
     private val GLOBAL_HANDLER: ConfigClassHandler<GlobalOptions> =
@@ -63,7 +64,7 @@ object FAConfig {
         get() {
             val player: LocalPlayer = checkNotNull(mc.player)
 
-            if (player.isFallFlying) {
+            if (player.isFallFlying || DragonSurvivalCompat.isDragonFlying(player)) {
                 return displaysStorage.flying
             }
 
