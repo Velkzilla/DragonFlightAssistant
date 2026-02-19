@@ -53,8 +53,14 @@ class AirDataComputer(computers: ComputerBus, private val mc: Minecraft) : Compu
     val fallDistanceSafe: Boolean
         get() = player.isInWater || fallDistance <= player.maxFallDistance || isInvulnerableTo(player.damageSources().fall())
 
+    // 速度平滑处理 - 一阶低通滤波器 (FIR Low-pass Filter)
+    // 截止频率 ≈ 0.8 Hz @ 20 TPS (α=0.2)
+    // y[n] = α × x[n] + (1-α) × y[n-1]
+    private var smoothedVelocity: Vec3 = Vec3.ZERO
+    private val velocityFilterAlpha = 0.2  // 滤波系数：越小越平滑，延迟越大
+    
     val velocity: Vec3
-        get() = player.deltaMovement
+        get() = smoothedVelocity
     val velocityPerSecond: Vec3
         get() = velocity.perSecond()
     var forwardVelocity: Vec3 = Vec3.ZERO
@@ -77,6 +83,17 @@ class AirDataComputer(computers: ComputerBus, private val mc: Minecraft) : Compu
         get() = degrees(atan2(-velocity.x, velocity.z).toFloat())
 
     override fun tick() {
+        // 一阶低通滤波：y[n] = α × x[n] + (1-α) × y[n-1]
+        val rawVelocity = player.deltaMovement
+        val alpha = velocityFilterAlpha
+        val oneMinusAlpha = 1.0 - alpha
+        
+        smoothedVelocity = Vec3(
+            alpha * rawVelocity.x + oneMinusAlpha * smoothedVelocity.x,
+            alpha * rawVelocity.y + oneMinusAlpha * smoothedVelocity.y,
+            alpha * rawVelocity.z + oneMinusAlpha * smoothedVelocity.z
+        )
+
         forwardVelocity = computeForwardVector(velocity)
         forwardVelocityPerSecond = forwardVelocity.perSecond()
         forwardAcceleration = forwardVelocity.length() - computeForwardVector(player.getLerpedDeltaMovement(0.0f)).length()
@@ -111,6 +128,7 @@ class AirDataComputer(computers: ComputerBus, private val mc: Minecraft) : Compu
         forwardVelocity = Vec3.ZERO
         forwardVelocityPerSecond = Vec3.ZERO
         forwardAcceleration = 0.0
+        smoothedVelocity = Vec3.ZERO
     }
 
     companion object {

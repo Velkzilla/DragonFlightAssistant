@@ -23,6 +23,12 @@ class HudDisplayDataComputer(computers: ComputerBus, private val mc: Minecraft) 
 
     var lerpedPosition: Vec3 = Vec3.ZERO
         private set
+    
+    // 速度平滑处理 - 一阶低通滤波器 (FIR Low-pass Filter)
+    // 与 AirDataComputer 使用相同的参数
+    private var smoothedLerpedVelocity: Vec3 = Vec3.ZERO
+    private val velocityFilterAlpha = 0.2
+    
     var lerpedVelocity: Vec3 = Vec3.ZERO
         private set
     var lerpedForwardVelocity: Vec3 = Vec3.ZERO
@@ -36,12 +42,25 @@ class HudDisplayDataComputer(computers: ComputerBus, private val mc: Minecraft) 
 
     override fun renderTick() {
         lerpedPosition = player.getPosition(FATickCounter.partialTick)
-        lerpedVelocity = player.getLerpedDeltaMovement(FATickCounter.partialTick)
+        
+        // 获取原始插值速度并应用低通滤波
+        val rawLerpedVelocity = player.getLerpedDeltaMovement(FATickCounter.partialTick)
+        val alpha = velocityFilterAlpha
+        val oneMinusAlpha = 1.0 - alpha
+        
+        smoothedLerpedVelocity = Vec3(
+            alpha * rawLerpedVelocity.x + oneMinusAlpha * smoothedLerpedVelocity.x,
+            alpha * rawLerpedVelocity.y + oneMinusAlpha * smoothedLerpedVelocity.y,
+            alpha * rawLerpedVelocity.z + oneMinusAlpha * smoothedLerpedVelocity.z
+        )
+        lerpedVelocity = smoothedLerpedVelocity
+        
         lerpedForwardVelocity = computers.data.computeForwardVector(lerpedVelocity)
     }
 
     override fun reset() {
         lerpedPosition = Vec3.ZERO
+        smoothedLerpedVelocity = Vec3.ZERO
         lerpedVelocity = Vec3.ZERO
         lerpedForwardVelocity = Vec3.ZERO
     }
