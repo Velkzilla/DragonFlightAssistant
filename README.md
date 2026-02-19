@@ -14,12 +14,25 @@
 
 #### 龙飞行 HUD 演示 / Dragon Flight HUD Demo
 
-> **注意 / Note:** 如果视频无法加载，请查看 [images 目录](images/) 中的本地文件。
-> If videos fail to load, check the local files in [images directory](images/).
+> [!TIP]
+> **视频播放 / Video Playback:** 
+> - GitHub 网页可能无法直接播放视频，请**下载视频文件到本地播放**
+> - 或在 GitHub 桌面客户端中查看
+> - 或点击文件名在 GitHub 中打开
+>
+> **Video Playback on GitHub:**
+> - GitHub web may not play videos directly, **download for local playback**
+> - Or view in GitHub desktop client
+> - Or click filename to open on GitHub
 
-| 起飞演示 / Takeoff Demo | 滑翔演示 / Gliding Demo | 完整飞行 / Full Flight |
-|------------------------|------------------------|----------------------|
-| <video src="https://github.com/Octol1ttle/FlightAssistant/raw/dev/images/2026-02-19%2013-53-37-00.00.10.700-00.00.19.497-seg2.mp4" width="200" /> | <video src="https://github.com/Octol1ttle/FlightAssistant/raw/dev/images/2026-02-19%2013-53-37-00.00.27.167-00.00.33.667-seg3.mp4" width="200" /> | <video src="https://github.com/Octol1ttle/FlightAssistant/raw/dev/images/2026-02-19%2013-53-37-00.00.58.067-00.01.12.983-seg1.mp4" width="200" /> |
+| 生存飞行和告警 / Survival Flight & Alerts | 创造滑翔 / Creative Gliding | 创造飞行 / Creative Flight |
+|------------------------------------------|----------------------------|---------------------------|
+| [📹 生存飞行和告警.mp4](./images/生存飞行和告警.mp4) <br> <video src="./images/生存飞行和告警.mp4" width="200" controls /> | [📹 创造滑翔.mp4](./images/创造滑翔.mp4) <br> <video src="./images/创造滑翔.mp4" width="200" controls /> | [📹 创造飞行.mp4](./images/创造飞行.mp4) <br> <video src="./images/创造飞行.mp4" width="200" controls /> |
+
+> **下载链接 / Download Links:**
+> - [生存飞行和告警.mp4](./images/生存飞行和告警.mp4) (18.1 MB)
+> - [创造滑翔.mp4](./images/创造滑翔.mp4) (13.7 MB)
+> - [创造飞行.mp4](./images/创造飞行.mp4) (15.0 MB)
 
 #### 系统架构图 / System Architecture
 
