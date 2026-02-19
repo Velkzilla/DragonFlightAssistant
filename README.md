@@ -1,3 +1,59 @@
+<!-- ============================================================================ -->
+<!-- DragonSurvival 兼容性分支 / DragonSurvival Compatibility Fork                -->
+<!-- ============================================================================ -->
+
+> [!IMPORTANT]
+> **此分支添加了 DragonSurvival 模组支持** / **This fork adds DragonSurvival mod support**
+> 
+> 如果你在使用 DragonSurvival 模组，请使用此版本！
+> If you are using DragonSurvival mod, use this version!
+
+## 🐉 DragonSurvival 兼容性 / DragonSurvival Compatibility
+
+### 快速预览 / Quick Preview
+
+#### 龙飞行 HUD 演示 / Dragon Flight HUD Demo
+
+> **注意 / Note:** 如果视频无法加载，请查看 [images 目录](images/) 中的本地文件。
+> If videos fail to load, check the local files in [images directory](images/).
+
+| 起飞演示 / Takeoff Demo | 滑翔演示 / Gliding Demo | 完整飞行 / Full Flight |
+|------------------------|------------------------|----------------------|
+| <video src="https://github.com/Octol1ttle/FlightAssistant/raw/dev/images/2026-02-19%2013-53-37-00.00.10.700-00.00.19.497-seg2.mp4" width="200" /> | <video src="https://github.com/Octol1ttle/FlightAssistant/raw/dev/images/2026-02-19%2013-53-37-00.00.27.167-00.00.33.667-seg3.mp4" width="200" /> | <video src="https://github.com/Octol1ttle/FlightAssistant/raw/dev/images/2026-02-19%2013-53-37-00.00.58.067-00.01.12.983-seg1.mp4" width="200" /> |
+
+#### 系统架构图 / System Architecture
+
+![System Architecture](images/diagram.png)
+
+#### 功能特性 / Features
+
+- ✅ **龙飞行状态检测** - 自动识别龙的飞行/滑翔状态
+- ✅ **完整 HUD 支持** - 空速仪、高度表、飞行轨迹预测
+- ✅ **自动模式切换** - 地面 ↔ 飞行 自动切换显示模式
+- ✅ **速度平滑处理** - FIR 滤波器消除 HUD 抖动
+- ✅ **无需配置** - 自动检测 DragonSurvival 并启用支持
+
+#### 安装要求 / Requirements
+
+| 必需 / Required | 可选 / Optional |
+|----------------|-----------------|
+| DragonSurvival | YACL (配置界面) |
+| GeckoLib | |
+| Architectury API | |
+| KFF (NeoForge) / FLK (Fabric) | |
+
+> [!WARNING]
+> **不兼容性警告 / Incompatibility Warning**
+> - ❌ 不能与原版 FlightAssistant 共存
+> - ❌ 服务器必须安装 DragonSurvival 才能显示龙飞行 HUD
+> 
+> - Cannot coexist with vanilla FlightAssistant
+> - Server must have DragonSurvival for dragon flight HUD
+
+---
+
+## 原版 FlightAssistant / Original FlightAssistant
+
 <p align=center>
     <img src="images/logo.png">
 </p>
@@ -19,7 +75,7 @@
 
 ---
 
-**FlightAssistant** is a powerful client-side mod that adds fully configurable full-fledged avionics, situational awareness tools and advanced automation to Minecraft elytras, while still being friendly to casual users. 
+**FlightAssistant** is a powerful client-side mod that adds fully configurable full-fledged avionics, situational awareness tools and advanced automation to Minecraft elytras, while still being friendly to casual users.
 
 ## Main Features
 
@@ -36,3 +92,136 @@
   - Flight plans can be saved to disk and loaded later
   - With flight plans, a flight can be performed completely automatically from takeoff to landing
     <img src="https://github.com/Octol1ttle/FlightAssistant/wiki/img/hud/full_screenshot.png">
+
+### Known Issues & Limitations
+
+#### ⚠️ Incompatibilities
+
+1. **Cannot coexist with vanilla FlightAssistant**
+   - This fork modifies core flight detection logic
+   - Installing both will cause conflicts
+   - **Solution:** Use only this fork or the original, not both
+
+2. **Server-side requirements**
+   - DragonSurvival must be installed on the server
+   - FlightAssistant is client-side only
+   - Server without DragonSurvival = no dragon flight HUD
+
+#### ⚠️ Testing Status
+
+**Tested scenarios:**
+- ✅ Singleplayer dragon flight
+- ✅ Multiplayer dragon flight (DragonSurvival on server)
+- ✅ HUD display mode switching
+- ✅ Velocity smoothing (FIR filter)
+
+**Untested/Partially tested:**
+- ⚠️ Server with mixed dragon/human players
+- ⚠️ Dragon flight with elytra equipped
+- ⚠️ Compatibility with other flight mods (Do A Barrel Roll, etc.)
+- ⚠️ Long-term stability in production servers
+
+#### ⚠️ Technical Limitations
+
+1. **Velocity smoothing delay**
+   - FIR low-pass filter introduces ~0.25 second delay
+   - This is intentional to prevent HUD flickering
+   - **Trade-off:** Smooth display vs. real-time accuracy
+   - **Adjustment:** Modify `velocityFilterAlpha` in code (0.1-0.3 range)
+
+2. **Reflection-based compatibility**
+   - Uses reflection to access DragonSurvival internals
+   - May break if DragonSurvival API changes
+   - **Risk:** Updates to DragonSurvival may require updates to this fork
+
+3. **Flight state detection**
+   - Dragon flight uses `FlightData.areWingsSpread` + `hasFlight`
+   - Additional conditions: not on ground, not in water/lava, not passenger
+   - May not detect edge cases (spectator mode, creative flight, etc.)
+
+#### ⚠️ Known Bugs
+
+| Issue | Severity | Workaround |
+|-------|----------|------------|
+| HUD flickering during rapid flight state changes | Low | FIR filter reduces but doesn't eliminate |
+| Velocity display lag (~0.25s) | Low | Intentional design trade-off |
+| Server sync delay for dragon flight state | Medium | Depends on server tick rate |
+| Possible incompatibility with other flight mods | Unknown | Test before deploying |
+
+### For Maintainers
+
+#### Code Changes
+
+This fork modifies the following core components:
+
+1. **`AirDataComputer.kt`**
+   - Added `DragonSurvivalCompat.isDragonFlying()` to flight detection
+   - Implemented FIR low-pass filter for velocity smoothing
+
+2. **`HudDisplayDataComputer.kt`**
+   - Added independent FIR filter for HUD velocity data
+   - Ensures consistency with `AirDataComputer`
+
+3. **`FAConfig.kt`**
+   - Updated `display` property to use compound flight detection
+
+4. **`DragonSurvivalCompat.kt`** (new)
+   - Reflection-based compatibility layer
+   - Detects dragon flight state without hard dependency
+
+#### Parameter Tuning
+
+**Velocity Filter (FIR Low-pass)**
+```kotlin
+// AirDataComputer.kt & HudDisplayDataComputer.kt
+private val velocityFilterAlpha = 0.2  // Adjust this value
+```
+
+| Alpha | Cut-off Frequency | Delay | Use Case |
+|-------|-------------------|-------|----------|
+| 0.1 | ~0.35 Hz | ~0.5s | Maximum smoothness |
+| **0.2** | **~0.8 Hz** | **~0.25s** | **Recommended (balanced)** |
+| 0.3 | ~1.4 Hz | ~0.15s | Maximum responsiveness |
+
+**Dragon Flight Detection**
+```kotlin
+// DragonSurvivalCompat.kt
+val isDragonFlying = isDragon && hasFlight && areWingsSpread && 
+                     !onGround && !inWater && !inLava && !isPassenger
+```
+
+#### Testing Checklist
+
+Before merging or releasing:
+
+- [ ] Singleplayer dragon flight HUD
+- [ ] Multiplayer dragon flight HUD
+- [ ] Elytra flight still works
+- [ ] Human player (no dragon) HUD works
+- [ ] Flight state transitions (ground ↔ air)
+- [ ] Velocity display stability
+- [ ] No console errors on startup
+- [ ] Server compatibility test
+
+#### Reporting Issues
+
+When reporting bugs, please include:
+
+1. Mod versions (FlightAssistant, DragonSurvival, etc.)
+2. Loader (NeoForge/Fabric) and version
+3. Minecraft version
+4. Singleplayer or multiplayer
+5. Log file (especially DragonSurvival compatibility logs)
+6. Steps to reproduce
+
+---
+
+## Credits
+
+- **Original FlightAssistant:** [Octol1ttle](https://github.com/Octol1ttle/FlightAssistant)
+- **DragonSurvival:** [DragonSurvival Team](https://github.com/DragonSurvivalTeam/DragonSurvival)
+- **This Fork:** Community contribution for DragonSurvival compatibility
+
+## License
+
+This fork inherits the LGPLv3 license from the original FlightAssistant mod.

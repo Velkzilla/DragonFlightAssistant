@@ -53,11 +53,66 @@ class AirDataComputer(computers: ComputerBus, private val mc: Minecraft) : Compu
     val fallDistanceSafe: Boolean
         get() = player.isInWater || fallDistance <= player.maxFallDistance || isInvulnerableTo(player.damageSources().fall())
 
+    // ============================================================================
     // 速度平滑处理 - 一阶低通滤波器 (FIR Low-pass Filter)
-    // 截止频率 ≈ 0.8 Hz @ 20 TPS (α=0.2)
+    // Velocity Smoothing - First-order FIR Low-pass Filter
+    // ============================================================================
+    //
+    // 【问题 / Problem】
+    // Minecraft 的 deltaMovement 每帧都在变化，导致 HUD 速度读数抖动（例如在 16-17 之间跳变）。
+    // 这在 DragonSurvival 龙飞行模式下尤为明显，因为龙的飞行物理计算与原版鞘翅不同。
+    //
+    // Minecraft's deltaMovement changes every frame, causing HUD speed readings to flicker
+    // (e.g., jumping between 16-17). This is especially noticeable in DragonSurvival's
+    // dragon flight mode because dragon flight physics differ from vanilla elytra.
+    //
+    // 【解决方案 / Solution】
+    // 使用一阶 FIR 低通滤波器平滑速度数据：
     // y[n] = α × x[n] + (1-α) × y[n-1]
+    //
+    // Use first-order FIR low-pass filter to smooth velocity data:
+    // y[n] = α × x[n] + (1-α) × y[n-1]
+    //
+    // 其中 / Where:
+    //   - y[n] = 当前输出（平滑后的速度）/ current output (smoothed velocity)
+    //   - x[n] = 当前输入（原始速度）/ current input (raw velocity)
+    //   - y[n-1] = 上次输出 / previous output
+    //   - α = 滤波系数 / filter coefficient
+    //
+    // 【参数选择 / Parameter Selection】
+    // velocityFilterAlpha = 0.2
+    //   - 截止频率 / Cut-off frequency: fc ≈ 0.8 Hz @ 20 TPS
+    //   - 延迟 / Delay: ~0.25 秒 / seconds
+    //   - 在响应性和平滑度之间取得平衡
+    //   - Balanced between responsiveness and smoothness
+    //
+    // 【调整指南 / Adjustment Guide】
+    //   α = 0.1 → 更平滑，延迟 ~0.5s / Smoother, delay ~0.5s
+    //   α = 0.2 → 推荐 / Recommended (平衡 / Balanced)
+    //   α = 0.3 → 更响应，延迟 ~0.15s / More responsive, delay ~0.15s
+    //
+    // 【注意事项 / Caveats】
+    // 1. 此滤波会影响所有依赖速度的 HUD 组件（空速仪、飞行轨迹预测等）
+    //    This filter affects all velocity-dependent HUD components (airspeed indicator,
+    //    flight path predictor, etc.)
+    // 2. 延迟是固定的，不会随速度变化
+    //    The delay is fixed and does not vary with speed
+    // 3. 如果未来添加加速度相关的 HUD，需要考虑滤波对加速度计算的影响
+    //    If acceleration-related HUD is added in the future, consider the filter's
+    //    impact on acceleration calculations
+    // 4. HudDisplayDataComputer 也使用相同的滤波器参数，确保一致性
+    //    HudDisplayDataComputer uses the same filter parameters for consistency
+    //
+    // 【维护者提示 / Maintainer Notes】
+    // - 如果发现 HUD 响应太慢，可以增大 alpha，但会增加抖动
+    //   If HUD feels too sluggish, increase alpha, but this will increase flickering
+    // - 如果抖动严重，可以减小 alpha，但会增加延迟
+    //   If flickering is severe, decrease alpha, but this will increase delay
+    // - 不要完全移除滤波，除非找到更好的替代方案
+    //   Do not remove the filter entirely unless a better alternative is found
+    // ============================================================================
     private var smoothedVelocity: Vec3 = Vec3.ZERO
-    private val velocityFilterAlpha = 0.2  // 滤波系数：越小越平滑，延迟越大
+    private val velocityFilterAlpha = 0.2
     
     val velocity: Vec3
         get() = smoothedVelocity

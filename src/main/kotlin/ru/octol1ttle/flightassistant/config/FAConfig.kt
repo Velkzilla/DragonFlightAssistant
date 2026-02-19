@@ -64,6 +64,26 @@ object FAConfig {
         get() {
             val player: LocalPlayer = checkNotNull(mc.player)
 
+            // ====================================================================
+            // 飞行状态检测 / Flight State Detection
+            // ====================================================================
+            // 使用复合检测逻辑：
+            // 1. player.isFallFlying() - 原版鞘翅飞行
+            // 2. DragonSurvivalCompat.isDragonFlying() - DragonSurvival 龙飞行
+            //
+            // Uses compound detection logic:
+            // 1. player.isFallFlying() - Vanilla elytra flight
+            // 2. DragonSurvivalCompat.isDragonFlying() - DragonSurvival dragon flight
+            //
+            // 【注意 / Note】
+            // - 此检测会影响 HUD 配置的选择（flying / notFlyingHasElytra / notFlyingNoElytra）
+            //   This detection affects HUD config selection
+            // - 实际速度数据由 AirDataComputer 和 HudDisplayDataComputer 提供，
+            //   已应用 FIR 低通滤波器防止抖动
+            //   Actual velocity data is provided by AirDataComputer and
+            //   HudDisplayDataComputer, with FIR low-pass filter applied to
+            //   prevent flickering
+            // ====================================================================
             if (player.isFallFlying || DragonSurvivalCompat.isDragonFlying(player)) {
                 return displaysStorage.flying
             }
