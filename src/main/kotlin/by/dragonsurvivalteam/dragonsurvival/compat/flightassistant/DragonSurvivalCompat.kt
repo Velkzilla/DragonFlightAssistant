@@ -143,18 +143,18 @@ object DragonSurvivalCompat {
     /**
      * 检测玩家是否为龙且正在飞行/滑翔
      * Check if player is a dragon and currently flying/gliding
-     * 
+     *
      * 【性能 / Performance】
      * - 每 tick 调用，但只使用缓存的反射对象，开销极小
      * - Called every tick, but only uses cached reflection objects, minimal overhead
-     * 
+     *
      * @param player 要检测的玩家 / Player to check
      * @return 如果是龙且在飞行 / True if dragon and flying
      */
     fun isDragonFlying(player: LocalPlayer): Boolean {
         // 懒加载初始化 / Lazy init
         ensureInitialized()
-        
+
         if (!isDragonSurvivalLoaded) {
             return false
         }
@@ -177,7 +177,7 @@ object DragonSurvivalCompat {
 
             // Check if wings are spread (cached field access, no reflection overhead)
             val areWingsSpread = areWingsSpreadField?.getBoolean(flightData) ?: return false
-            
+
             // Dragon must not be on ground or in fluids to be considered flying
             val onGround = player.onGround()
             val inWater = player.isInWater
@@ -185,6 +185,63 @@ object DragonSurvivalCompat {
             val isPassenger = player.isPassenger
 
             return areWingsSpread && !onGround && !inWater && !inLava && !isPassenger
+        } catch (e: Exception) {
+            // 静默失败，避免刷屏日志 / Silent failure to avoid log spam
+            return false
+        }
+    }
+
+    /**
+     * 检测玩家是否为龙且翅膀已展开（主动按 G 键切换到飞行模式）
+     * Check if player is a dragon and wings are spread (manually toggled flight mode by pressing G)
+     *
+     * 【用途 / Use Case】
+     * 当龙玩家主动按 G 键切换到飞行模式但不在飞行过程中时（如站在地面），
+     * 此方法返回 true，用于激活"未飞行（装备鞘翅）"UI。
+     *
+     * When dragon player manually toggles flight mode by pressing G but is not flying (e.g., standing on ground),
+     * this method returns true, used to activate "Not flying (with elytra)" UI.
+     *
+     * 【与 isDragonFlying 的区别 / Difference from isDragonFlying】
+     * - isDragonFlying: 检测是否正在飞行/滑翔（areWingsSpread=true 且不在地面/流体中）
+     * - isDragonWingsSpread: 检测翅膀是否展开（areWingsSpread=true），无论是否在地面
+     *
+     * - isDragonFlying: Detects if currently flying/gliding (areWingsSpread=true and not on ground/in fluids)
+     * - isDragonWingsSpread: Detects if wings are spread (areWingsSpread=true), regardless of position
+     *
+     * 【DragonSurvival 飞行状态说明 / DragonSurvival Flight State】
+     * - 按 G 键时，areWingsSpread 在 true/false 之间切换
+     * - hasFlight: 是否有飞行能力（通过技能解锁）
+     * - areWingsSpread: 是否主动展开翅膀（按 G 键切换）
+     *
+     * - When pressing G key, areWingsSpread toggles between true/false
+     * - hasFlight: Has flight capability (unlocked through skills)
+     * - areWingsSpread: Wings manually spread (toggled by G key)
+     *
+     * @param player 要检测的玩家 / Player to check
+     * @return 如果是龙且翅膀已展开 / True if dragon and wings are spread
+     */
+    fun isDragonWingsSpread(player: LocalPlayer): Boolean {
+        // 懒加载初始化 / Lazy init
+        ensureInitialized()
+
+        if (!isDragonSurvivalLoaded) {
+            return false
+        }
+
+        try {
+            // Check if player is a dragon (cached method, no reflection overhead)
+            val isDragon = isDragonMethod?.invoke(null, player) as? Boolean ?: return false
+            if (!isDragon) {
+                return false
+            }
+
+            // Get flight data (cached method, no reflection overhead)
+            val flightData = getDataMethod?.invoke(null, player) ?: return false
+
+            // Check if wings are spread (cached field access, no reflection overhead)
+            // This is true when player pressed G to toggle flight mode, regardless of position
+            return areWingsSpreadField?.getBoolean(flightData) ?: false
         } catch (e: Exception) {
             // 静默失败，避免刷屏日志 / Silent failure to avoid log spam
             return false

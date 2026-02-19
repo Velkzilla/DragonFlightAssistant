@@ -100,6 +100,12 @@ object FAConfig {
                     return displaysStorage.notFlyingHasElytra
                 }
 //?}
+
+                // 检查龙玩家是否主动按 G 键切换到飞行模式（翅膀展开但可能在地面）
+                // Check if dragon player has manually toggled flight mode by pressing G (wings spread but may be on ground)
+                if (DragonSurvivalCompat.isDragonWingsSpread(player)) {
+                    return displaysStorage.notFlyingHasElytra
+                }
             }
 
             return displaysStorage.notFlyingNoElytra
