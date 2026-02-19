@@ -41,6 +41,8 @@
 //    not in water/lava, not passenger
 // 4. 如果 DragonSurvival API 变更，需要更新反射方法签名
 //    If DragonSurvival API changes, reflection method signatures need updating
+// 5. 使用懒加载 + 缓存避免性能问题和初始化死锁
+//    Uses lazy loading + caching to avoid performance issues and initialization deadlocks
 //
 // 【维护者提示 / Maintainer Notes】
 // - 此兼容层在 FlightAssistantForge 和 FlightAssistantFabric 中初始化
@@ -49,16 +51,19 @@
 // - 如果 DragonSurvival 变为硬依赖，可以移除此兼容层直接使用 API
 //   If DragonSurvival becomes a hard dependency, this layer can be removed
 //   to use the API directly
-// - 调试日志在初始化时会输出详细信息
-//   Debug logs output detailed information during initialization
+// - 初始化使用懒加载，避免模组加载顺序问题
+//   Initialization uses lazy loading to avoid mod loading order issues
 // ============================================================================
 
 package by.dragonsurvivalteam.dragonsurvival.compat.flightassistant
 
 import dev.architectury.platform.Platform
 import net.minecraft.client.player.LocalPlayer
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.player.Player
 import ru.octol1ttle.flightassistant.FlightAssistant
+import java.lang.reflect.Field
+import java.lang.reflect.Method
 
 /**
  * DragonSurvival 兼容性工具类
@@ -66,112 +71,132 @@ import ru.octol1ttle.flightassistant.FlightAssistant
  *
  * 提供龙飞行状态检测，等效于原版的 isFallFlying()
  * Provides dragon flight state detection, equivalent to vanilla isFallFlying()
+ *
+ * 【性能优化 / Performance Optimization】
+ * - 所有反射对象在首次调用时懒加载并缓存
+ * - isDragonFlying() 每 tick 调用，但只使用缓存的 Method/Field，无反射开销
+ * - 初始化失败时静默降级，不影响主模组功能
+ *
+ * All reflection objects are lazily loaded and cached on first call
+ * isDragonFlying() is called every tick, but only uses cached Method/Field, no reflection overhead
+ * Silently degrades on initialization failure, doesn't affect main mod functionality
  */
 object DragonSurvivalCompat {
     private const val DRAGON_SURVIVAL_MOD_ID = "dragonsurvival"
+    
+    // 懒加载初始化标志（避免死锁）/ Lazy init flag (avoid deadlock)
+    private var isInitialized: Boolean = false
     private var isDragonSurvivalLoaded: Boolean = false
 
-    // Reflection caches for DragonSurvival classes/methods
+    // Reflection caches - 缓存 Method 和 Field 对象，避免每 tick 反射
+    // Cache Method and Field objects to avoid per-tick reflection
     private var dragonStateProviderClass: Class<*>? = null
     private var flightDataClass: Class<*>? = null
-    private var dsDataAttachmentsClass: Class<*>? = null
-    private var getDataMethod: ((Player) -> Any)? = null
-    private var isDragonMethod: ((LocalPlayer) -> Boolean)? = null
-    private var flightAttachmentField: Any? = null
+    private var isDragonMethod: Method? = null
+    private var getDataMethod: Method? = null
+    private var hasFlightField: Field? = null
+    private var areWingsSpreadField: Field? = null
 
-    fun init() {
+    /**
+     * 懒加载初始化（首次调用时执行）
+     * Lazy initialization (executes on first call)
+     * 
+     * 【为什么用懒加载 / Why lazy loading?】
+     * 1. 避免模组加载顺序问题 - DragonSurvival 可能还没完成初始化
+     * 2. 避免死锁 - 在 FlightAssistant 初始化时不强制加载 DragonSurvival
+     * 3. 性能优化 - 只有龙玩家在线时才会初始化
+     * 
+     * 1. Avoids mod loading order issues - DragonSurvival may not be fully initialized
+     * 2. Avoids deadlocks - Doesn't force load DragonSurvival during FlightAssistant init
+     * 3. Performance optimization - Only initializes when dragon player is online
+     */
+    private fun ensureInitialized() {
+        if (isInitialized) return
+        
+        isInitialized = true
         isDragonSurvivalLoaded = Platform.isModLoaded(DRAGON_SURVIVAL_MOD_ID)
-        FlightAssistant.logger.info("DragonSurvival loaded: $isDragonSurvivalLoaded")
+        
         if (!isDragonSurvivalLoaded) {
             return
         }
 
-        FlightAssistant.logger.info("Initializing support for DragonSurvival")
-
         try {
-            // Cache DragonStateProvider class
+            // Cache classes
             dragonStateProviderClass = Class.forName("by.dragonsurvivalteam.dragonsurvival.common.capability.DragonStateProvider")
-            FlightAssistant.logger.info("Found DragonStateProvider class")
-            
-            // Cache FlightData class
             flightDataClass = Class.forName("by.dragonsurvivalteam.dragonsurvival.registry.attachments.FlightData")
-            FlightAssistant.logger.info("Found FlightData class")
             
-            // Cache DSDataAttachments class
-            dsDataAttachmentsClass = Class.forName("by.dragonsurvivalteam.dragonsurvival.registry.attachments.DSDataAttachments")
-            FlightAssistant.logger.info("Found DSDataAttachments class")
+            // Cache methods - 注意参数类型 / Note parameter types
+            isDragonMethod = dragonStateProviderClass!!.getMethod("isDragon", Entity::class.java)
+            getDataMethod = flightDataClass!!.getMethod("getData", Player::class.java)
             
-            // Cache methods - isDragon takes Entity, getData takes Player
-            val getDataMethodHandle = flightDataClass!!.getMethod("getData", Player::class.java)
-            getDataMethod = { player -> getDataMethodHandle.invoke(null, player) }
-            FlightAssistant.logger.info("Cached getData method")
-
-            val isDragonMethodHandle = dragonStateProviderClass!!.getMethod("isDragon", net.minecraft.world.entity.Entity::class.java)
-            isDragonMethod = { player -> isDragonMethodHandle.invoke(null, player) as Boolean }
-            FlightAssistant.logger.info("Cached isDragon method")
+            // Cache fields - 直接访问公共字段 / Access public fields directly
+            hasFlightField = flightDataClass!!.getField("hasFlight")
+            areWingsSpreadField = flightDataClass!!.getField("areWingsSpread")
             
-            // Cache FLIGHT attachment field from DSDataAttachments
-            flightAttachmentField = dsDataAttachmentsClass!!.getField("FLIGHT").get(null)
-            FlightAssistant.logger.info("Cached FLIGHT attachment")
-            
-            FlightAssistant.logger.info("DragonSurvival support initialized successfully")
+            FlightAssistant.logger.info("DragonSurvival compatibility initialized successfully")
         } catch (e: Exception) {
-            FlightAssistant.logger.error("Failed to initialize DragonSurvival support", e)
+            FlightAssistant.logger.error("Failed to initialize DragonSurvival compatibility", e)
             isDragonSurvivalLoaded = false
         }
     }
 
     /**
-     * Checks if the player is a dragon and currently flying/gliding.
-     * This is the DragonSurvival equivalent of isFallFlying().
+     * 检测玩家是否为龙且正在飞行/滑翔
+     * Check if player is a dragon and currently flying/gliding
+     * 
+     * 【性能 / Performance】
+     * - 每 tick 调用，但只使用缓存的反射对象，开销极小
+     * - Called every tick, but only uses cached reflection objects, minimal overhead
+     * 
+     * @param player 要检测的玩家 / Player to check
+     * @return 如果是龙且在飞行 / True if dragon and flying
      */
     fun isDragonFlying(player: LocalPlayer): Boolean {
+        // 懒加载初始化 / Lazy init
+        ensureInitialized()
+        
         if (!isDragonSurvivalLoaded) {
             return false
         }
 
         try {
-            // Check if player is a dragon
-            val isDragon = isDragonMethod?.invoke(player) ?: return false
-            FlightAssistant.logger.debug("DragonSurvival: isDragon=$isDragon")
+            // Check if player is a dragon (cached method, no reflection overhead)
+            val isDragon = isDragonMethod?.invoke(null, player) as? Boolean ?: return false
             if (!isDragon) {
                 return false
             }
 
-            // Get flight data using Player interface
-            val flightData = getDataMethod?.invoke(player) ?: return false
-            FlightAssistant.logger.debug("DragonSurvival: got flightData")
+            // Get flight data (cached method, no reflection overhead)
+            val flightData = getDataMethod?.invoke(null, player) ?: return false
 
-            // Access public fields directly
-            val hasFlightField = flightDataClass!!.getField("hasFlight")
-            val hasFlight = hasFlightField.get(flightData) as Boolean
-            FlightAssistant.logger.debug("DragonSurvival: hasFlight=$hasFlight")
+            // Check flight capability (cached field access, no reflection overhead)
+            val hasFlight = hasFlightField?.getBoolean(flightData) ?: return false
             if (!hasFlight) {
                 return false
             }
 
-            val areWingsSpreadField = flightDataClass!!.getField("areWingsSpread")
-            val areWingsSpread = areWingsSpreadField.get(flightData) as Boolean
-            FlightAssistant.logger.debug("DragonSurvival: areWingsSpread=$areWingsSpread")
+            // Check if wings are spread (cached field access, no reflection overhead)
+            val areWingsSpread = areWingsSpreadField?.getBoolean(flightData) ?: return false
             
             // Dragon must not be on ground or in fluids to be considered flying
             val onGround = player.onGround()
             val inWater = player.isInWater
             val inLava = player.isInLava
             val isPassenger = player.isPassenger
-            FlightAssistant.logger.debug("DragonSurvival: onGround=$onGround, inWater=$inWater, inLava=$inLava, isPassenger=$isPassenger")
 
-            val result = areWingsSpread && !onGround && !inWater && !inLava && !isPassenger
-            FlightAssistant.logger.debug("DragonSurvival: isDragonFlying=$result")
-            return result
+            return areWingsSpread && !onGround && !inWater && !inLava && !isPassenger
         } catch (e: Exception) {
-            FlightAssistant.logger.warn("Error checking dragon flight state", e)
+            // 静默失败，避免刷屏日志 / Silent failure to avoid log spam
             return false
         }
     }
 
     /**
-     * Returns true if DragonSurvival is loaded.
+     * 返回 DragonSurvival 是否已加载
+     * Returns true if DragonSurvival is loaded
      */
-    fun isLoaded(): Boolean = isDragonSurvivalLoaded
+    fun isLoaded(): Boolean {
+        ensureInitialized()
+        return isDragonSurvivalLoaded
+    }
 }
